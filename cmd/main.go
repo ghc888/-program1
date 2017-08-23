@@ -39,6 +39,13 @@ func handleConnection(conn net.Conn) {
 }
 
 func handleConnectionV2(con net.Conn) {
+	defer con.Close()
+
+	clientHost, _, err := net.SplitHostPort(con.RemoteAddr().String())
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("client ip allow conenction server", clientHost)
 	newconn := module.NewConn(con)
 
 	data, err := newconn.ReadPacket()
@@ -50,6 +57,7 @@ func handleConnectionV2(con net.Conn) {
 	pos++
 	fmt.Println("message :", string(data[pos:]))
 }
+
 func main() {
 
 	listener, err := net.Listen("tcp", ":8080")

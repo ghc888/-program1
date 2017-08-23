@@ -49,9 +49,6 @@ func (c *Conn) ReadPacket() ([]byte, error) {
 	}
 }
 
-/*
-封包
-*/
 func (c *Conn) ReadPacketTo(w io.Writer) error {
 	header := []byte{0, 0, 0, 0}
 
@@ -89,6 +86,9 @@ func (c *Conn) ReadPacketTo(w io.Writer) error {
 	return nil
 }
 
+/*
+封包
+*/
 // data already has 4 bytes header
 // will modify data inplace
 func (c *Conn) WritePacket(data []byte) error {
