@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net"
+	"program1/module"
 )
 
 /*
@@ -37,6 +38,18 @@ func handleConnection(conn net.Conn) {
 
 }
 
+func handleConnectionV2(con net.Conn) {
+	newconn := module.NewConn(con)
+
+	data, err := newconn.ReadPacket()
+	if err != nil {
+		fmt.Println("read client message error:", err)
+	}
+	pos := 0
+	fmt.Println("message topic:", data[pos])
+	pos++
+	fmt.Println("message :", string(data[pos:]))
+}
 func main() {
 
 	listener, err := net.Listen("tcp", ":8080")
@@ -50,7 +63,7 @@ func main() {
 			fmt.Println("server accept error:", err)
 			continue
 		}
-		go handleConnection(con)
+		go handleConnectionV2(con)
 	}
 
 }

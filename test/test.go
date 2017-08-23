@@ -1,21 +1,32 @@
 package main
 
 import (
-	"bytes"
-	"encoding/base64"
 	"fmt"
-	"io"
-	"os"
+	"net"
+	"program1/module"
+)
+
+const (
+	UP_ACTION             = 1 //上传
+	DOWN_ACTION           = 2 //下载
+	OTHER_ACTION          = 4 //其他
+	defaultReaderSize     = 8 * 1024
+	MaxPayloadLen     int = 1<<24 - 1
 )
 
 func main() {
+	conn, err := net.Dial("tcp", "127.0.0.1:8080")
+	if err != nil {
+		fmt.Println("connection server error:", err)
+	}
+	var ServerVersion string = "1.1.2"
+	client := module.NewConn(conn)
 
-	var b bytes.Buffer // A Buffer needs no initialization.
-	b.Write([]byte("Hello "))
-	fmt.Fprintf(&b, "world!")
-	b.WriteTo(os.Stdout)
+	//缓冲区 预留4个字节的包头位置,在WritePacket中进行封装包头
+	data := make([]byte, 4, 128)
 
-	buf := bytes.NewBufferString("R29waGVycyBydWxlIQ==")
-	dec := base64.NewDecoder(base64.StdEncoding, buf)
-	io.Copy(os.Stdout, dec)
+	data = append(data, 1)
+	data = append(data, ServerVersion...)
+
+	client.WritePacket(data)
 }
