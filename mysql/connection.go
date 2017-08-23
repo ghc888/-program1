@@ -10,9 +10,7 @@ import (
 /*
 mysql 相关数据包信息
 */
-var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_FLAG |
-	mysql.CLIENT_CONNECT_WITH_DB | mysql.CLIENT_PROTOCOL_41 |
-	mysql.CLIENT_TRANSACTIONS | mysql.CLIENT_SECURE_CONNECTIO
+var DEFAULT_CAPABILITY uint32 = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG | CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 | CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTIO
 
 var baseConnId uint32 = 10000
 
@@ -57,7 +55,7 @@ func NewClientConn(co net.Conn) *ClientConn {
 	c.pkg.Sequence = 0
 
 	//初始化连接id  自增id
-	c.connectionId = atomic.AddInt32(&baseConnId, 1)
+	c.connectionId = atomic.AddUint32(&baseConnId, 1)
 	c.status = SERVER_STATUS_AUTOCOMMIT
 	c.salt, _ = RandomBuf(20)
 	c.closed = false
