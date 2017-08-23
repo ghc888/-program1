@@ -5,6 +5,7 @@ import (
 	"program1/mysql"
 )
 
+//https://segmentfault.com/a/1190000006744213#articleHeader5
 func (c *ClientConn) DispatchMessage(message []byte) error {
 	fmt.Println("dispatcher revice message:", string(message))
 	command := message[0]
