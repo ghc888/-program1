@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"sync/atomic"
 )
 
 /*
@@ -22,15 +21,11 @@ client 连接信息
 type ClientConn struct {
 	sync.Mutex
 
-	//数据包操作指针
 	pkg *PacketIO
-
 	//连接对象
-	c          net.Conn
-	capability uint32
-
+	c            net.Conn
+	capability   uint32
 	connectionId uint32
-
 	status       uint16
 	collation    CollationId
 	charset      string
@@ -41,30 +36,6 @@ type ClientConn struct {
 	lastInsertId int64
 	affectedRows int64
 	stmtId       uint32
-}
-
-/*
-初始化客户端连接信息
-*/
-func NewClientConn(co net.Conn) *ClientConn {
-	c := new(ClientConn)
-	tcpConn := co.(*net.TCPConn)
-	tcpConn.SetNoDelay(false)
-	tcpConn.SetKeepAlive(true)
-	c.pkg = NewPacketIO(tcpConn)
-
-	//初始化包序列号
-	c.pkg.Sequence = 0
-
-	//初始化连接id  自增id
-	c.connectionId = atomic.AddUint32(&baseConnId, 1)
-	c.status = SERVER_STATUS_AUTOCOMMIT
-	c.salt, _ = RandomBuf(20)
-	c.closed = false
-	c.charset = DEFAULT_CHARSET
-	c.collation = DEFAULT_COLLATION_ID
-	c.stmtId = 0
-	return c
 }
 
 //server 发送初始化握手包
@@ -169,4 +140,96 @@ func (c *ClientConn) readHandshakeResponse() error {
 	}
 	c.db = db
 	return nil
+}
+
+func (c *ClientConn) Handshake() error {
+	if err := c.writeInitialHandshake(); err != nil {
+		// golog.Error("server", "Handshake", err.Error(),
+		// 	c.connectionId, "msg", "send initial handshake error")
+		return err
+	}
+
+	if err := c.readHandshakeResponse(); err != nil {
+		// golog.Error("server", "readHandshakeResponse",
+		// 	err.Error(), c.connectionId,
+		// 	"msg", "read Handshake Response error")
+		return err
+	}
+
+	if err := c.writeOK(nil); err != nil {
+		// golog.Error("server", "readHandshakeResponse",
+		// 	"write ok fail",
+		// 	c.connectionId, "error", err.Error())
+		return err
+	}
+
+	c.pkg.Sequence = 0
+	return nil
+}
+
+func (c *ClientConn) writeOK(r *Result) error {
+	if r == nil {
+		r = &Result{Status: c.status}
+	}
+	data := make([]byte, 4, 32)
+
+	data = append(data, OK_HEADER)
+
+	data = append(data, PutLengthEncodedInt(r.AffectedRows)...)
+	data = append(data, PutLengthEncodedInt(r.InsertId)...)
+
+	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+		data = append(data, byte(r.Status), byte(r.Status>>8))
+		data = append(data, 0, 0)
+	}
+
+	return c.pkg.WritePacket(data)
+
+}
+func (c *ClientConn) writeError(e error) error {
+	var m *SqlError
+	var ok bool
+	if m, ok = e.(*SqlError); !ok {
+		m = NewError(ER_UNKNOWN_ERROR, e.Error())
+	}
+
+	data := make([]byte, 4, 16+len(m.Message))
+
+	data = append(data, ERR_HEADER)
+	data = append(data, byte(m.Code), byte(m.Code>>8))
+
+	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+		data = append(data, '#')
+		data = append(data, m.State...)
+	}
+
+	data = append(data, m.Message...)
+
+	return c.pkg.WritePacket(data)
+
+}
+
+func (c *ClientConn) writeEOF(status uint16) error {
+	data := make([]byte, 4, 9)
+
+	data = append(data, EOF_HEADER)
+	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+		data = append(data, 0, 0)
+		data = append(data, byte(status), byte(status>>8))
+	}
+
+	return c.pkg.WritePacket(data)
+
+}
+
+func (c *ClientConn) writeEOFBatch(total []byte, status uint16, direct bool) ([]byte, error) {
+	data := make([]byte, 4, 9)
+
+	data = append(data, EOF_HEADER)
+	if c.capability&CLIENT_PROTOCOL_41 > 0 {
+		data = append(data, 0, 0)
+		data = append(data, byte(status), byte(status>>8))
+	}
+
+	return c.writePacketBatch(total, data, direct)
 }
