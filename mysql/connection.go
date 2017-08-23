@@ -1,6 +1,8 @@
 package mysql
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"net"
 	"sync"
@@ -10,7 +12,7 @@ import (
 /*
 mysql 相关数据包信息
 */
-var DEFAULT_CAPABILITY uint32 = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG | CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 | CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTIO
+var DEFAULT_CAPABILITY uint32 = CLIENT_LONG_PASSWORD | CLIENT_LONG_FLAG | CLIENT_CONNECT_WITH_DB | CLIENT_PROTOCOL_41 | CLIENT_TRANSACTIONS | CLIENT_SECURE_CONNECTION
 
 var baseConnId uint32 = 10000
 
@@ -114,6 +116,54 @@ func (c *ClientConn) writeInitialHandshake() error {
 
 //server 解析初始化握手包的反馈信息
 func (c *ClientConn) readHandshakeResponse() error {
+	data, err := c.pkg.ReadPacket()
+	if err != nil {
+		return err
+	}
+	pos := 0
 
+	//capability
+	c.capability = binary.LittleEndian.Uint32(data[:4])
+	pos += 4
+	//skip max packet size
+	pos += 4
+	//charset, skip, if you want to use another charset, use set names
+	//c.collation = CollationId(data[pos])
+	pos++
+	//skip reserved 23[00]
+	pos += 23
+
+	//user name
+	c.user = string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
+	pos += len(c.user) + 1
+
+	//auth length and auth
+	authLen := int(data[pos])
+	pos++
+	//auth := data[pos : pos+authLen]
+
+	//权限认证
+	//checkAuth := CalcPassword(c.salt, []byte(c.proxy.cfg.Password))
+	// if c.user != c.proxy.cfg.User || !bytes.Equal(auth, checkAuth) {
+	// 	golog.Error("ClientConn", "readHandshakeResponse", "error", 0,
+	// 		"auth", auth,
+	// 		"checkAuth", checkAuth,
+	// 		"client_user", c.user,
+	// 		"config_set_user", c.proxy.cfg.User,
+	// 		"passworld", c.proxy.cfg.Password)
+	// 	return mysql.NewDefaultError(mysql.ER_ACCESS_DENIED_ERROR, c.user, c.c.RemoteAddr().String(), "Yes")
+	// }
+	pos += authLen
+	var db string
+	if c.capability&CLIENT_CONNECT_WITH_DB > 0 {
+		if len(data[pos:]) == 0 {
+			return nil
+		}
+
+		db = string(data[pos : pos+bytes.IndexByte(data[pos:], 0)])
+		pos += len(c.db) + 1
+
+	}
+	c.db = db
 	return nil
 }
