@@ -53,21 +53,24 @@ func (s *GateServer) NewClientConn(co net.Conn) *ClientConn {
 	return c
 }
 
-func (s *GateServer) handleConnectionV2(con net.Conn) {
-	defer con.Close()
+func (s *GateServer) handleConnectionV2(co net.Conn) {
+	defer co.Close()
 
-	clientHost, _, err := net.SplitHostPort(con.RemoteAddr().String())
+	clientHost, _, err := net.SplitHostPort(co.RemoteAddr().String())
 	if err != nil {
 		fmt.Println(err)
 	}
+	//判断client ip是否在白名单中
 	fmt.Println("client ip allow conenction server", clientHost)
 
-	newconn := s.NewClientConn(con)
-	err = newconn.Handshake()
+	//如果准许接入，发生握手信息进行账号密码认证
+	conn := s.NewClientConn(co)
+	err = conn.Handshake()
 	if err != nil {
 		fmt.Println("shandshake connection err:", err)
 	}
 
+	conn.Run()
 }
 
 func (s *GateServer) GRun() {

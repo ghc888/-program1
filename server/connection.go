@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"program1/mysql"
+	"runtime"
 	"sync"
 )
 
@@ -168,9 +169,9 @@ func (c *ClientConn) Handshake() error {
 	return nil
 }
 
-func (c *ClientConn) writeOK(r *Result) error {
+func (c *ClientConn) writeOK(r *mysql.Result) error {
 	if r == nil {
-		r = &mysql.Result{mysql.Status: c.status}
+		r = &mysql.Result{Status: c.status}
 	}
 	data := make([]byte, 4, 32)
 
@@ -233,4 +234,50 @@ func (c *ClientConn) writeEOFBatch(total []byte, status uint16, direct bool) ([]
 	}
 
 	return c.pkg.WritePacketBatch(total, data, direct)
+}
+func (c *ClientConn) Close() error {
+	if c.closed {
+		return nil
+	}
+
+	c.c.Close()
+
+	c.closed = true
+
+	return nil
+}
+
+/*
+循环处理用户请求
+*/
+func (c *ClientConn) Run() {
+	defer func() {
+		r := recover()
+		if err, ok := r.(error); ok {
+			const size = 4096
+			buf := make([]byte, size)
+			buf = buf[:runtime.Stack(buf, false)]
+
+			// golog.Error("ClientConn", "Run",
+			// 	err.Error(), 0,
+			// 	"stack", string(buf))
+		}
+
+		c.Close()
+	}()
+
+	for {
+		data, err := c.pkg.ReadPacket()
+		if err != nil {
+			return
+		}
+		//将解析出来的message 接入dispatcher server
+		DispatchMessage(data)
+		if c.closed {
+			return
+		}
+
+		c.pkg.Sequence = 0
+	}
+
 }
