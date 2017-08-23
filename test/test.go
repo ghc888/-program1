@@ -28,5 +28,7 @@ func main() {
 	data = append(data, 1)
 	data = append(data, ServerVersion...)
 
+	//发送
 	client.WritePacket(data)
+
 }
