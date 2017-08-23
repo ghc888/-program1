@@ -1,149 +1,116 @@
 package mysql
 
 import (
-	"bufio"
-	"bytes"
-	"errors"
 	"fmt"
-	"io"
 	"net"
-)
-
-const (
-	UP_ACTION             = 1 //上传
-	DOWN_ACTION           = 2 //下载
-	OTHER_ACTION          = 4 //其他
-	defaultReaderSize     = 8 * 1024
-	MaxPayloadLen     int = 1<<24 - 1
+	"program1/mysql"
+	"sync"
+	"sync/atomic"
 )
 
 /*
-Conn is the base class to handle MySQL protocol.
+mysql 相关数据包信息
 */
-type Conn struct {
-	net.Conn
-	br *bufio.Reader
+var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_FLAG |
+mysql.CLIENT_CONNECT_WITH_DB | mysql.CLIENT_PROTOCOL_41 |
+mysql.CLIENT_TRANSACTIONS | mysql.CLIENT_SECURE_CONNECTIO
 
-	Sequence uint8
+var baseConnId uint32 = 10000
+/*
+client 连接信息
+*/
+type ClientConn struct {
+	sync.Mutex
+
+	//数据包操作指针
+	pkg *PacketIO
+
+	//连接对象
+	c          net.Conn
+	capability uint32
+
+	connectionId uint32
+
+	status       uint16
+	collation    CollationId
+	charset      string
+	user         string
+	db           string
+	salt         []byte
+	closed       bool
+	lastInsertId int64
+	affectedRows int64
+	stmtId       uint32
 }
 
 /*
-初始化连接信息
+初始化客户端连接信息
 */
-func NewConn(conn net.Conn) *Conn {
-	c := new(Conn)
+func NewClientConn(co net.Conn) *ClientConn{
+	c := new(ClientConn)
+	tcpConn := co.(*net.TCPConn)
+	tcpConn.SetNoDelay(false)
+	tcpConn.SetKeepAlive(true)
+	c.pkg=NewPacketIO(tcpConn)
 
-	c.br = bufio.NewReaderSize(conn, 4096)
-	c.Conn = conn
+	//初始化包序列号
+	c.pkg.Sequence=0
 
-	return c
+	//初始化连接id  自增id
+	c.connectionId=atomic.AddInt32(&baseConnId,1)
+	c.status=SERVER_STATUS_AUTOCOMMIT
+	c.salt,_=RandomBuf(20)
 }
 
-/*
-拆包
-*/
-func (c *Conn) ReadPacket() ([]byte, error) {
-	var buf bytes.Buffer
+//server 发送初始化握手包
+func (c *ClientConn) writeInitialHandshake() error {
 
-	if err := c.ReadPacketTo(&buf); err != nil {
-		return nil, err
-	} else {
-		return buf.Bytes(), nil
-	}
+	fmt.Println("send initial handshake packet")
+	data := make([]byte, 4, 128)
+	//协议版本号 version 10
+	data = append(data, ProtocolVersion)
+
+	//server version[00]
+	data = append(data, ServerVersion...)
+	data = append(data, 0)
+
+	//connection id
+	data = append(data, byte(c.connectionId), byte(c.connectionId>>8), byte(c.connectionId>>16), byte(c.connectionId>>24))
+
+	//auth-plugin-data-part-1
+	data = append(data, c.salt[0:8]...)
+	//filter [00]
+	data = append(data, 0)
+
+	//capability flag lower 2 bytes, using default capability here
+	data = append(data, byte(DEFAULT_CAPABILITY), byte(DEFAULT_CAPABILITY>>8)
+	
+	//charset, utf-8 default
+	data = append(data, uint8(DEFAULT_COLLATION_ID))
+
+	//status
+	data = append(data, byte(c.status), byte(c.status>>8))
+	//below 13 byte may not be used
+	//capability flag upper 2 bytes, using default capability here
+	data = append(data, byte(DEFAULT_CAPABILITY>>16), byte(DEFAULT_CAPABILITY>>24))
+	
+	//filter [0x15], for wireshark dump, value is 0x15
+	data = append(data, 0x15)
+	
+	//reserved 10 [00]
+	data = append(data, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+	
+	//auth-plugin-data-part-2
+	data = append(data, c.salt[8:]...)
+	
+	//filter [00]
+	data = append(data, 0)
+
+	return c.pkg.WritePacket(data)
 }
 
-func (c *Conn) ReadPacketTo(w io.Writer) error {
-	header := []byte{0, 0, 0, 0}
+//server 解析初始化握手包的反馈信息
+func (c *ClientConn) readHandshakeResponse() error {
 
-	if _, err := io.ReadFull(c.br, header); err != nil {
-		return err
-	}
-
-	length := int(uint32(header[0]) | uint32(header[1])<<8 | uint32(header[2])<<16)
-	if length < 1 {
-		return fmt.Errorf("invalid payload length %d", length)
-	}
-
-	sequence := uint8(header[3])
-
-	if sequence != c.Sequence {
-		return fmt.Errorf("invalid sequence %d != %d", sequence, c.Sequence)
-	}
-
-	c.Sequence++
-
-	if n, err := io.CopyN(w, c.br, int64(length)); err != nil {
-		return errors.New("connection was bad")
-	} else if n != int64(length) {
-		return errors.New("connection was bad")
-	} else {
-		if length < MaxPayloadLen {
-			return nil
-		}
-
-		if err := c.ReadPacketTo(w); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-/*
-封包
-*/
-// data already has 4 bytes header
-// will modify data inplace
-func (c *Conn) WritePacket(data []byte) error {
-	length := len(data) - 4
-
-	for length >= MaxPayloadLen {
-		data[0] = 0xff
-		data[1] = 0xff
-		data[2] = 0xff
-
-		data[3] = c.Sequence
-
-		if n, err := c.Write(data[:4+MaxPayloadLen]); err != nil {
-			return errors.New("connection was bad")
-		} else if n != (4 + MaxPayloadLen) {
-			return errors.New("connection was bad")
-		} else {
-			c.Sequence++
-			length -= MaxPayloadLen
-			data = data[MaxPayloadLen:]
-		}
-	}
-
-	data[0] = byte(length)
-	data[1] = byte(length >> 8)
-	data[2] = byte(length >> 16)
-	data[3] = c.Sequence
-
-	if n, err := c.Write(data); err != nil {
-		return errors.New("connection was bad")
-	} else if n != len(data) {
-		return errors.New("connection was bad")
-	} else {
-		c.Sequence++
-		return nil
-	}
-}
-
-/*
-重置包序列号
-*/
-func (c *Conn) ResetSequence() {
-	c.Sequence = 0
-}
-
-/*
-关闭链接
-*/
-func (c *Conn) Close() error {
-	c.Sequence = 0
-	if c.Conn != nil {
-		return c.Conn.Close()
-	}
 	return nil
 }
