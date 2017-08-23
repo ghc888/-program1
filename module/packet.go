@@ -89,3 +89,28 @@ func (p *PacketIO) ReadPacket() ([]byte, error) {
 
 	return data, nil
 }
+
+/*
+封包
+*/
+func (p *PacketIO) WritePacket(data []byte) error {
+	data_len := len(data)
+	buff := make([]byte, 4+data_len)
+
+	for data_len >= MaxPayloadLen {
+		//每次写MaxPayloadLen个长度
+		buff[0] = 0xff
+		buff[1] = 0xff
+		buff[2] = 0xff
+		buff[3] = p.Sequence
+		append(buff[4],data)
+		if n,err:=p.wb.Write(buff)
+	}
+	//写包头
+	buff[0] = byte(data_len)
+	buff[1] = byte(data_len >> 8)
+	buff[2] = byte(data_len >> 16)
+	buff[3] = p.Sequence
+
+	return nil
+}
