@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
-	"program1/module"
+	"program1/mysql"
 )
 
 const (
@@ -20,7 +20,7 @@ func main() {
 		fmt.Println("connection server error:", err)
 	}
 	var ServerVersion string = "1.1.2"
-	client := module.NewConn(conn)
+	client := mysql.NewConn(conn)
 
 	//缓冲区 预留4个字节的包头位置,在WritePacket中进行封装包头
 	data := make([]byte, 4, 128)

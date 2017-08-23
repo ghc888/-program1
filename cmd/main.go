@@ -4,7 +4,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net"
-	"program1/module"
+	"program1/mysql"
 )
 
 /*
@@ -46,7 +46,7 @@ func handleConnectionV2(con net.Conn) {
 		fmt.Println(err)
 	}
 	fmt.Println("client ip allow conenction server", clientHost)
-	newconn := module.NewConn(con)
+	newconn := mysql.NewConn(con)
 
 	data, err := newconn.ReadPacket()
 	if err != nil {

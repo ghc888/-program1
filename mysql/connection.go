@@ -1,0 +1,149 @@
+package mysql
+
+import (
+	"bufio"
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+)
+
+const (
+	UP_ACTION             = 1 //上传
+	DOWN_ACTION           = 2 //下载
+	OTHER_ACTION          = 4 //其他
+	defaultReaderSize     = 8 * 1024
+	MaxPayloadLen     int = 1<<24 - 1
+)
+
+/*
+Conn is the base class to handle MySQL protocol.
+*/
+type Conn struct {
+	net.Conn
+	br *bufio.Reader
+
+	Sequence uint8
+}
+
+/*
+初始化连接信息
+*/
+func NewConn(conn net.Conn) *Conn {
+	c := new(Conn)
+
+	c.br = bufio.NewReaderSize(conn, 4096)
+	c.Conn = conn
+
+	return c
+}
+
+/*
+拆包
+*/
+func (c *Conn) ReadPacket() ([]byte, error) {
+	var buf bytes.Buffer
+
+	if err := c.ReadPacketTo(&buf); err != nil {
+		return nil, err
+	} else {
+		return buf.Bytes(), nil
+	}
+}
+
+func (c *Conn) ReadPacketTo(w io.Writer) error {
+	header := []byte{0, 0, 0, 0}
+
+	if _, err := io.ReadFull(c.br, header); err != nil {
+		return err
+	}
+
+	length := int(uint32(header[0]) | uint32(header[1])<<8 | uint32(header[2])<<16)
+	if length < 1 {
+		return fmt.Errorf("invalid payload length %d", length)
+	}
+
+	sequence := uint8(header[3])
+
+	if sequence != c.Sequence {
+		return fmt.Errorf("invalid sequence %d != %d", sequence, c.Sequence)
+	}
+
+	c.Sequence++
+
+	if n, err := io.CopyN(w, c.br, int64(length)); err != nil {
+		return errors.New("connection was bad")
+	} else if n != int64(length) {
+		return errors.New("connection was bad")
+	} else {
+		if length < MaxPayloadLen {
+			return nil
+		}
+
+		if err := c.ReadPacketTo(w); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+/*
+封包
+*/
+// data already has 4 bytes header
+// will modify data inplace
+func (c *Conn) WritePacket(data []byte) error {
+	length := len(data) - 4
+
+	for length >= MaxPayloadLen {
+		data[0] = 0xff
+		data[1] = 0xff
+		data[2] = 0xff
+
+		data[3] = c.Sequence
+
+		if n, err := c.Write(data[:4+MaxPayloadLen]); err != nil {
+			return errors.New("connection was bad")
+		} else if n != (4 + MaxPayloadLen) {
+			return errors.New("connection was bad")
+		} else {
+			c.Sequence++
+			length -= MaxPayloadLen
+			data = data[MaxPayloadLen:]
+		}
+	}
+
+	data[0] = byte(length)
+	data[1] = byte(length >> 8)
+	data[2] = byte(length >> 16)
+	data[3] = c.Sequence
+
+	if n, err := c.Write(data); err != nil {
+		return errors.New("connection was bad")
+	} else if n != len(data) {
+		return errors.New("connection was bad")
+	} else {
+		c.Sequence++
+		return nil
+	}
+}
+
+/*
+重置包序列号
+*/
+func (c *Conn) ResetSequence() {
+	c.Sequence = 0
+}
+
+/*
+关闭链接
+*/
+func (c *Conn) Close() error {
+	c.Sequence = 0
+	if c.Conn != nil {
+		return c.Conn.Close()
+	}
+	return nil
+}
