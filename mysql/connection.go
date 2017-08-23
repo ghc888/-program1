@@ -3,7 +3,6 @@ package mysql
 import (
 	"fmt"
 	"net"
-	"program1/mysql"
 	"sync"
 	"sync/atomic"
 )
@@ -12,10 +11,11 @@ import (
 mysql 相关数据包信息
 */
 var DEFAULT_CAPABILITY uint32 = mysql.CLIENT_LONG_PASSWORD | mysql.CLIENT_LONG_FLAG |
-mysql.CLIENT_CONNECT_WITH_DB | mysql.CLIENT_PROTOCOL_41 |
-mysql.CLIENT_TRANSACTIONS | mysql.CLIENT_SECURE_CONNECTIO
+	mysql.CLIENT_CONNECT_WITH_DB | mysql.CLIENT_PROTOCOL_41 |
+	mysql.CLIENT_TRANSACTIONS | mysql.CLIENT_SECURE_CONNECTIO
 
 var baseConnId uint32 = 10000
+
 /*
 client 连接信息
 */
@@ -46,20 +46,25 @@ type ClientConn struct {
 /*
 初始化客户端连接信息
 */
-func NewClientConn(co net.Conn) *ClientConn{
+func NewClientConn(co net.Conn) *ClientConn {
 	c := new(ClientConn)
 	tcpConn := co.(*net.TCPConn)
 	tcpConn.SetNoDelay(false)
 	tcpConn.SetKeepAlive(true)
-	c.pkg=NewPacketIO(tcpConn)
+	c.pkg = NewPacketIO(tcpConn)
 
 	//初始化包序列号
-	c.pkg.Sequence=0
+	c.pkg.Sequence = 0
 
 	//初始化连接id  自增id
-	c.connectionId=atomic.AddInt32(&baseConnId,1)
-	c.status=SERVER_STATUS_AUTOCOMMIT
-	c.salt,_=RandomBuf(20)
+	c.connectionId = atomic.AddInt32(&baseConnId, 1)
+	c.status = SERVER_STATUS_AUTOCOMMIT
+	c.salt, _ = RandomBuf(20)
+	c.closed = false
+	c.charset = DEFAULT_CHARSET
+	c.collation = DEFAULT_COLLATION_ID
+	c.stmtId = 0
+	return c
 }
 
 //server 发送初始化握手包
@@ -83,8 +88,8 @@ func (c *ClientConn) writeInitialHandshake() error {
 	data = append(data, 0)
 
 	//capability flag lower 2 bytes, using default capability here
-	data = append(data, byte(DEFAULT_CAPABILITY), byte(DEFAULT_CAPABILITY>>8)
-	
+	data = append(data, byte(DEFAULT_CAPABILITY), byte(DEFAULT_CAPABILITY>>8))
+
 	//charset, utf-8 default
 	data = append(data, uint8(DEFAULT_COLLATION_ID))
 
@@ -93,16 +98,16 @@ func (c *ClientConn) writeInitialHandshake() error {
 	//below 13 byte may not be used
 	//capability flag upper 2 bytes, using default capability here
 	data = append(data, byte(DEFAULT_CAPABILITY>>16), byte(DEFAULT_CAPABILITY>>24))
-	
+
 	//filter [0x15], for wireshark dump, value is 0x15
 	data = append(data, 0x15)
-	
+
 	//reserved 10 [00]
 	data = append(data, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-	
+
 	//auth-plugin-data-part-2
 	data = append(data, c.salt[8:]...)
-	
+
 	//filter [00]
 	data = append(data, 0)
 
