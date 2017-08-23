@@ -8,10 +8,11 @@ import (
 )
 
 const (
-	UP_ACTION         = 1 //上传
-	DOWN_ACTION       = 2 //下载
-	OTHER_ACTION      = 4 //其他
-	defaultReaderSize = 8 * 1024
+	UP_ACTION             = 1 //上传
+	DOWN_ACTION           = 2 //下载
+	OTHER_ACTION          = 4 //其他
+	defaultReaderSize     = 8 * 1024
+	MaxPayloadLen     int = 1<<24 - 1
 )
 
 /*
@@ -68,6 +69,22 @@ func (p *PacketIO) ReadPacket() ([]byte, error) {
 
 	if _, err := io.ReadFull(p.rb, data); err != nil {
 		return nil, fmt.Errorf("bad connection! error:%s", err)
+	}
+
+	//处理粘包
+	//要读取的数据小于maxpayloadlen
+	if length < MaxPayloadLen {
+		return data, nil
+	}
+	//要读取的数据大于maxpayloadlen,再次递归读取
+	var buf []byte
+
+	buf, err := p.ReadPacket()
+	if err != nil {
+		return nil, fmt.Errorf("bad connection!")
+	} else {
+
+		return append(data, buf...), nil
 	}
 
 	return data, nil
