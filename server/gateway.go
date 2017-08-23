@@ -37,7 +37,7 @@ func (s *GateServer) NewClientConn(co net.Conn) *mysql.ClientConn {
 	tcpConn := co.(*net.TCPConn)
 	tcpConn.SetNoDelay(false)
 	tcpConn.SetKeepAlive(true)
-	c.pkg = NewPacketIO(tcpConn)
+	c.c = NewPacketIO(tcpConn)
 
 	//初始化包序列号
 	c.pkg.Sequence = 0

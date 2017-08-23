@@ -231,5 +231,5 @@ func (c *ClientConn) writeEOFBatch(total []byte, status uint16, direct bool) ([]
 		data = append(data, byte(status), byte(status>>8))
 	}
 
-	return c.writePacketBatch(total, data, direct)
+	return c.pkg.WritePacketBatch(total, data, direct)
 }
