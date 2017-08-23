@@ -31,24 +31,24 @@ func NewServer() (*GateServer, error) {
 /*
 初始化客户端连接信息
 */
-func (s *GateServer) NewClientConn(co net.Conn) *mysql.ClientConn {
+func (s *GateServer) NewClientConn(co net.Conn) *ClientConn {
 
-	c := new(mysql.ClientConn)
+	c := new(ClientConn)
+
 	tcpConn := co.(*net.TCPConn)
 	tcpConn.SetNoDelay(false)
 	tcpConn.SetKeepAlive(true)
-	c.c = NewPacketIO(tcpConn)
-
+	c.c = tcpConn
 	//初始化包序列号
 	c.pkg.Sequence = 0
 
 	//初始化连接id  自增id
 	c.connectionId = atomic.AddUint32(&baseConnId, 1)
-	c.status = SERVER_STATUS_AUTOCOMMIT
-	c.salt, _ = RandomBuf(20)
+	c.status = mysql.SERVER_STATUS_AUTOCOMMIT
+	c.salt, _ = mysql.RandomBuf(20)
 	c.closed = false
-	c.charset = DEFAULT_CHARSET
-	c.collation = DEFAULT_COLLATION_ID
+	c.charset = mysql.DEFAULT_CHARSET
+	c.collation = mysql.DEFAULT_COLLATION_ID
 	c.stmtId = 0
 	return c
 }
@@ -63,15 +63,11 @@ func (s *GateServer) handleConnectionV2(con net.Conn) {
 	fmt.Println("client ip allow conenction server", clientHost)
 
 	newconn := s.NewClientConn(con)
-
-	data, err := newconn.ReadPacket()
+	err = newconn.Handshake()
 	if err != nil {
-		fmt.Println("read client message error:", err)
+		fmt.Println("shandshake connection err:", err)
 	}
-	pos := 0
-	fmt.Println("message topic:", data[pos])
-	pos++
-	fmt.Println("message :", string(data[pos:]))
+
 }
 
 func (s *GateServer) GRun() {
