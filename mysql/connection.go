@@ -140,19 +140,22 @@ func (c *ClientConn) readHandshakeResponse() error {
 	//auth length and auth
 	authLen := int(data[pos])
 	pos++
-	//auth := data[pos : pos+authLen]
+	auth := data[pos : pos+authLen]
 
 	//权限认证
-	//checkAuth := CalcPassword(c.salt, []byte(c.proxy.cfg.Password))
-	// if c.user != c.proxy.cfg.User || !bytes.Equal(auth, checkAuth) {
-	// 	golog.Error("ClientConn", "readHandshakeResponse", "error", 0,
-	// 		"auth", auth,
-	// 		"checkAuth", checkAuth,
-	// 		"client_user", c.user,
-	// 		"config_set_user", c.proxy.cfg.User,
-	// 		"passworld", c.proxy.cfg.Password)
-	// 	return mysql.NewDefaultError(mysql.ER_ACCESS_DENIED_ERROR, c.user, c.c.RemoteAddr().String(), "Yes")
-	// }
+	var User string = "root"
+	var Password string = "123"
+	checkAuth := CalcPassword(c.salt, []byte(Password))
+	if c.user != User || !bytes.Equal(auth, checkAuth) {
+
+		// 	golog.Error("ClientConn", "readHandshakeResponse", "error", 0,
+		// 		"auth", auth,
+		// 		"checkAuth", checkAuth,
+		// 		"client_user", c.user,
+		// 		"config_set_user", c.proxy.cfg.User,
+		// 		"passworld", c.proxy.cfg.Password)
+		return NewDefaultError(ER_ACCESS_DENIED_ERROR, c.user, c.c.RemoteAddr().String(), "Yes")
+	}
 	pos += authLen
 	var db string
 	if c.capability&CLIENT_CONNECT_WITH_DB > 0 {
