@@ -9,8 +9,10 @@ import (
 	"strings"
 )
 
+/*
+
+ */
 type ExecuteDB struct {
-	// ExecNode *backend.Node
 	IsSlave bool
 	sql     string
 }
@@ -218,10 +220,10 @@ func (c *ClientConn) GetExecDB(tokens []string, sql string) (*ExecuteDB, error) 
 		if ok == true {
 			switch tokenId {
 			case mysql.TK_ID_SELECT:
-				fmt.Println("select command ")
+				fmt.Println("select command")
 				//return c.getSelectExecDB(sql, tokens, tokensLen)
 			case mysql.TK_ID_DELETE:
-				fmt.Println("delete command ")
+				fmt.Println("delete command")
 				//return c.getDeleteExecDB(sql, tokens, tokensLen)
 			case mysql.TK_ID_INSERT, mysql.TK_ID_REPLACE:
 				fmt.Println("insert repliace command")
