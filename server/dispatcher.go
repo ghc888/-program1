@@ -24,8 +24,8 @@ func (c *ClientConn) DispatchMessage(message []byte) error {
 	case mysql.COM_QUIT:
 		fmt.Println("revice com_quit command")
 		// c.handleRollback()
-		// c.Close()
-		// return nil
+		c.Close()
+		return nil
 	case mysql.COM_QUERY:
 		fmt.Println("revice com_query command")
 		return c.handleQuery(utils.String(data))
@@ -69,15 +69,11 @@ func (c *ClientConn) DispatchMessage(message []byte) error {
 func (c *ClientConn) handleQuery(sql string) (err error) {
 	defer func() {
 		if e := recover(); e != nil {
-			// golog.OutputSql("Error", "err:%v,sql:%s", e, sql)
 			if err, ok := e.(error); ok {
 				const size = 4096
 				buf := make([]byte, size)
 				buf = buf[:runtime.Stack(buf, false)]
-
-				// golog.Error("ClientConn", "handleQuery",
 				fmt.Println(err.Error())
-				// "stack", string(buf), "sql", sql)
 			}
 			return
 		}
@@ -151,21 +147,10 @@ func (c *ClientConn) preHandleShard(sql string) (bool, error) {
 	if len(sql) == 0 {
 		return false, fmt.Errorf("unsport command")
 	}
-	//filter the blacklist sql
-	// if c.proxy.blacklistSqls[c.proxy.blacklistSqlsIndex].sqlsLen != 0 {
-	// 	if c.isBlacklistSql(sql) {
-	// 		golog.OutputSql("Forbidden", "%s->%s:%s",
-	// 			c.c.RemoteAddr(),
-	// 			c.proxy.addr,
-	// 			sql,
-	// 		)
-	// 		err := mysql.NewError(mysql.ER_UNKNOWN_ERROR, "sql in blacklist.")
-	// 		return false, err
-	// 	}
-	// }
+	//TODOsql白名单处理
 
 	tokens := strings.FieldsFunc(sql, utils.IsSqlSep)
-
+	fmt.Println(tokens)
 	if len(tokens) == 0 {
 		return false, fmt.Errorf("unsport comand")
 	}
@@ -234,7 +219,7 @@ func (c *ClientConn) GetExecDB(tokens []string, sql string) (*ExecuteDB, error) 
 			switch tokenId {
 			case mysql.TK_ID_SELECT:
 				fmt.Println("select command ")
-				//return c.getSelectExecDB(sql, tokens, tokensLen)
+				return c.getSelectExecDB(sql, tokens, tokensLen)
 			case mysql.TK_ID_DELETE:
 				fmt.Println("delete command ")
 				//return c.getDeleteExecDB(sql, tokens, tokensLen)
