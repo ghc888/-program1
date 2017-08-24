@@ -8,7 +8,7 @@ import (
 )
 
 /*
-入口server 
+入口server
 */
 type GateServer struct {
 	addr     string //侦听地址

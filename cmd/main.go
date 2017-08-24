@@ -4,7 +4,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net"
-	"program1/mysql"
+	"program1/server"
 )
 
 /*
@@ -38,27 +38,7 @@ func handleConnection(conn net.Conn) {
 
 }
 
-func handleConnectionV2(con net.Conn) {
-	defer con.Close()
-
-	clientHost, _, err := net.SplitHostPort(con.RemoteAddr().String())
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("client ip allow conenction server", clientHost)
-	newconn := mysql.NewConn(con)
-
-	data, err := newconn.ReadPacket()
-	if err != nil {
-		fmt.Println("read client message error:", err)
-	}
-	pos := 0
-	fmt.Println("message topic:", data[pos])
-	pos++
-	fmt.Println("message :", string(data[pos:]))
-}
-
-func main() {
+func TestMain() {
 
 	listener, err := net.Listen("tcp", ":8080")
 	if err != nil {
@@ -71,7 +51,15 @@ func main() {
 			fmt.Println("server accept error:", err)
 			continue
 		}
-		go handleConnectionV2(con)
+		go handleConnection(con)
 	}
 
+}
+
+func main() {
+	gate, err := server.NewServer()
+	if err != nil {
+		fmt.Println("inital gate server error", err)
+	}
+	gate.GRun()
 }

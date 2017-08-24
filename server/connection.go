@@ -61,7 +61,7 @@ func (c *ClientConn) writeInitialHandshake() error {
 	data = append(data, 0)
 
 	//capability flag lower 2 bytes, using default capability here
-	data = append(data, byte(mysql.DEFAULT_CAPABILITY), byte(mysql.DEFAULT_CAPABILITY>>8))
+	data = append(data, byte(DEFAULT_CAPABILITY), byte(DEFAULT_CAPABILITY>>8))
 
 	//charset, utf-8 default
 	data = append(data, uint8(mysql.DEFAULT_COLLATION_ID))
@@ -70,7 +70,7 @@ func (c *ClientConn) writeInitialHandshake() error {
 	data = append(data, byte(c.status), byte(c.status>>8))
 	//below 13 byte may not be used
 	//capability flag upper 2 bytes, using default capability here
-	data = append(data, byte(mysql.DEFAULT_CAPABILITY>>16), byte(mysql.DEFAULT_CAPABILITY>>24))
+	data = append(data, byte(DEFAULT_CAPABILITY>>16), byte(DEFAULT_CAPABILITY>>24))
 
 	//filter [0x15], for wireshark dump, value is 0x15
 	data = append(data, 0x15)
@@ -189,10 +189,10 @@ func (c *ClientConn) writeOK(r *mysql.Result) error {
 
 }
 func (c *ClientConn) writeError(e error) error {
-	var m *SqlError
+	var m *mysql.SqlError
 	var ok bool
 	if m, ok = e.(*mysql.SqlError); !ok {
-		m = NewError(mysql.ER_UNKNOWN_ERROR, e.Error())
+		m = mysql.NewError(mysql.ER_UNKNOWN_ERROR, e.Error())
 	}
 
 	data := make([]byte, 4, 16+len(m.Message))
@@ -257,7 +257,7 @@ func (c *ClientConn) Run() {
 			const size = 4096
 			buf := make([]byte, size)
 			buf = buf[:runtime.Stack(buf, false)]
-
+			fmt.Println(err.Error())
 			// golog.Error("ClientConn", "Run",
 			// 	err.Error(), 0,
 			// 	"stack", string(buf))
@@ -272,7 +272,7 @@ func (c *ClientConn) Run() {
 			return
 		}
 		//将解析出来的message 接入dispatcher server
-		DispatchMessage(data)
+		c.DispatchMessage(data)
 		if c.closed {
 			return
 		}
