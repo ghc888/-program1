@@ -177,11 +177,11 @@ func (c *ClientConn) preHandleShard(sql string) (bool, error) {
 		return false, nil
 	}
 	//get connection in DB
-	// conn, err := c.getBackendConn(executeDB.ExecNode, executeDB.IsSlave)
-	// defer c.closeConn(conn, false)
-	// if err != nil {
-	// 	return false, err
-	// }
+	//conn, err := c.getBackendConn(executeDB.ExecNode, executeDB.IsSlave)
+	//defer c.closeConn(conn, false)
+	//if err != nil {
+	//	return false, err
+	//}
 	// //execute.sql may be rewritten in getShowExecDB
 	// rs, err = c.executeInNode(conn, executeDB.sql, nil)
 	// if err != nil {
@@ -219,7 +219,7 @@ func (c *ClientConn) GetExecDB(tokens []string, sql string) (*ExecuteDB, error) 
 			switch tokenId {
 			case mysql.TK_ID_SELECT:
 				fmt.Println("select command ")
-				return c.getSelectExecDB(sql, tokens, tokensLen)
+				//return c.getSelectExecDB(sql, tokens, tokensLen)
 			case mysql.TK_ID_DELETE:
 				fmt.Println("delete command ")
 				//return c.getDeleteExecDB(sql, tokens, tokensLen)
