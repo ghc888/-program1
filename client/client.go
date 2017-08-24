@@ -13,8 +13,6 @@ type P struct {
 	X, Y float32
 }
 
-
-
 func main() {
 
 	conn, err := net.Dial("tcp", "127.0.0.1:8080")

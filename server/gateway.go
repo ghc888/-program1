@@ -39,6 +39,8 @@ func (s *GateServer) NewClientConn(co net.Conn) *ClientConn {
 	tcpConn.SetNoDelay(false)
 	tcpConn.SetKeepAlive(true)
 	c.c = tcpConn
+
+	c.pkg = mysql.NewPacketIO(tcpConn)
 	//初始化包序列号
 	c.pkg.Sequence = 0
 
@@ -54,7 +56,7 @@ func (s *GateServer) NewClientConn(co net.Conn) *ClientConn {
 }
 
 func (s *GateServer) handleConnectionV2(co net.Conn) {
-	defer co.Close()
+	//defer co.Close()
 
 	clientHost, _, err := net.SplitHostPort(co.RemoteAddr().String())
 	if err != nil {
@@ -65,6 +67,7 @@ func (s *GateServer) handleConnectionV2(co net.Conn) {
 
 	//如果准许接入，发生握手信息进行账号密码认证
 	conn := s.NewClientConn(co)
+
 	err = conn.Handshake()
 	if err != nil {
 		fmt.Println("shandshake connection err:", err)
@@ -82,6 +85,7 @@ func (s *GateServer) GRun() {
 			fmt.Println("server accept error:", err)
 			continue
 		}
+
 		go s.handleConnectionV2(con)
 	}
 }
