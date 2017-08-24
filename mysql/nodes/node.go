@@ -23,7 +23,13 @@ type Node struct {
 */
 func (n *Node) GetNodeConn(is_slave bool) (*BackendConn, error) {
 
+	if is_slave {
+		//读取从库,
+		n.Slave.checkConn()
+
+	}
 	db := n.Master
+
 	if db == nil {
 		return nil, fmt.Errorf("No connection find!")
 	}

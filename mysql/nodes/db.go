@@ -38,6 +38,7 @@ type DB struct {
 	cacheConns  chan *DBConn
 	checkConn   *DBConn
 	lastPing    int64
+	Is_alive    bool
 }
 
 func Open(addr string, user string, password string, dbName string, maxConnNum int) (*DB, error) {
