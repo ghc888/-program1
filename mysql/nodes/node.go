@@ -25,7 +25,11 @@ func (n *Node) GetNodeConn(is_slave bool) (*BackendConn, error) {
 
 	if is_slave {
 		//读取从库,
-		n.Slave.checkConn()
+		if n.Slave.Is_alive {
+			return n.Slave.GetConn() 
+		} else {
+			return n.Master.GetConn() 
+		}
 
 	}
 	db := n.Master
@@ -33,9 +37,9 @@ func (n *Node) GetNodeConn(is_slave bool) (*BackendConn, error) {
 	if db == nil {
 		return nil, fmt.Errorf("No connection find!")
 	}
-	// if atomic.LoadInt32(&(db.state)) == Down {
-	// 	return nil, errors.ErrMasterDown
-	// }
+	  if atomic.LoadInt32(&(db.state)) == Down {
+	  	return nil,fmt.Errorf("master down")
+	 }
 
-	return db.GetConn()
+	return db.GetConn(
 }

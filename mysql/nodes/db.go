@@ -160,6 +160,7 @@ func (db *DB) Ping() error {
 	if db.checkConn == nil {
 		db.checkConn, err = db.newConn()
 		if err != nil {
+			db.Is_alive = false
 			db.closeConn(db.checkConn)
 			db.checkConn = nil
 			return err
@@ -167,20 +168,21 @@ func (db *DB) Ping() error {
 	}
 	err = db.checkConn.Ping()
 	if err != nil {
+		db.Is_alive = false
 		db.closeConn(db.checkConn)
 		db.checkConn = nil
 		return err
 	}
+	db.Is_alive = true
 	return nil
 }
 
 func (db *DB) newConn() (*DBConn, error) {
 	co := new(DBConn)
-
 	if err := co.Connect(db.addr, db.user, db.password, db.db); err != nil {
+		db.Is_alive = false
 		return nil, err
 	}
-
 	return co, nil
 }
 
@@ -227,7 +229,6 @@ func (db *DB) tryReuse(co *DBConn) error {
 			return err
 		}
 	}
-
 	return nil
 }
 

@@ -85,7 +85,6 @@ func (c *DBConn) ReConnect() error {
 
 	if err := c.writeAuthHandshake(); err != nil {
 		c.conn.Close()
-
 		return err
 	}
 
